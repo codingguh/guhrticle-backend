@@ -4,6 +4,6 @@ import {signup,login } from "../controllers/auth";
 const authRoutes = Router()
 
 authRoutes.post('/signup',signup)
-authRoutes.get('/login',login)
+authRoutes.post('/login',login)
 
 export default authRoutes
