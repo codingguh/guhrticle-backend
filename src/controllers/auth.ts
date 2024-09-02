@@ -1,40 +1,65 @@
-import { Request,Response } from "express"
+import { Request, Response } from "express";
 import { prismaClient } from "..";
-import {hashSync,compareSync} from "bcrypt";
-import * as jwt from "jsonwebtoken"
+import { hashSync, compareSync } from "bcrypt";
+import * as jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../secrets";
 
-export const signup = async (req:Request,res:Response) =>{
-    const {email,password,name} = req.body;
+// Sign-up function
+export const signup = async (req: Request, res: Response) => {
+  try {
+    const { email, password, name } = req.body;
 
-    let user = await prismaClient.user.findFirst({where:{email}})
-    if(user){
-        throw Error('User already exists')
+    // Check if the user already exists
+    let user = await prismaClient.user.findFirst({ where: { email } });
+    if (user) {
+      return res.status(400).json({ message: 'User already exists' });
     }
+
+    // Create a new user with hashed password
     user = await prismaClient.user.create({
-        data:{
-            name,
-            email,
-            password:hashSync(password,10)
-        }
-    })
-   
-    res.json(user)
-}
+      data: {
+        name,
+        email,
+        password: hashSync(password, 10),
+      },
+    });
 
-export const login = async (req:Request,res:Response) =>{
-    const {email,password} = req.body;
+    // Respond with the created user
+    res.status(201).json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Internal Server Error', error: error });
+  }
+};
 
-    let user = await prismaClient.user.findFirst({where:{email}})
-    if(!user){
-        throw Error('User does not exists')
+// Login function
+export const login = async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+
+    // Check if the user exists
+    const user = await prismaClient.user.findFirst({ where: { email } });
+    if (!user) {
+      return res.status(400).json({ message: 'User does not exist' });
     }
 
-    if(!compareSync(password,user.password)){
-        throw Error('Incorrect password')
+    // Compare the provided password with the stored hashed password
+    const isPasswordValid = compareSync(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: 'Incorrect password' });
     }
-    const token = jwt.sign({
-        userId:user.id,
-     },JWT_SECRET)
-    res.json({user,token})
-}
+
+    // Generate a JWT token
+    const token = jwt.sign(
+      {
+        userId: user.id,
+      },
+      JWT_SECRET,
+      { expiresIn: '1h' } // Set an expiration time for better security
+    );
+
+    // Respond with the user and token
+    res.json({ user, token });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal Server Error', error: error });
+  }
+};
